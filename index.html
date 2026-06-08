@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Boston Aesthetics Business Card Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+        h2 {
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+            color: #ffffff;
+        }
+        .subtitle {
+            font-size: 13px;
+            color: #888888;
+            margin-bottom: 30px;
+            letter-spacing: 1px;
+        }
+        .container {
+            display: flex;
+            gap: 40px;
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+            max-width: 1100px;
+            width: 100%;
+        }
+        .form-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-width: 400px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        label {
+            font-size: 11px;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        input {
+            background: #2a2a2a;
+            border: 1px solid #3a3a3a;
+            padding: 11px;
+            border-radius: 6px;
+            color: #ffffff;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        input:focus { border-color: #00bc5d; }
+        
+        .file-custom-btn {
+            background: #2d2d2d;
+            border: 1px dashed #555;
+            padding: 12px;
+            text-align: center;
+            border-radius: 6px;
+            cursor: pointer;
+            color: #00bc5d;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        .file-custom-btn:hover { background: #353535; }
+        
+        .preview-section {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            align-items: center;
+        }
+        .card-title-tag {
+            font-size: 12px;
+            color: #a0a0a0;
+            margin-bottom: 5px;
+            align-self: flex-start;
+            letter-spacing: 1px;
+            border-left: 3px solid #00bc5d;
+            padding-left: 8px;
+        }
+        .preview-wrapper {
+            position: relative;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+            border-radius: 4px;
+            overflow: hidden;
+            background-color: #111111;
+            width: 455px;
+            height: 260px;
+        }
+        .preview-wrapper img {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        canvas { display: none; }
+        
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .btn-print {
+            background: #00bc5d;
+            color: white;
+            border: none;
+            padding: 14px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            text-align: center;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn-print:hover { background: #009a4c; }
+        .btn-secondary { background: #3a3a3a; }
+        .btn-secondary:hover { background: #4a4a4a; }
+    </style>
+</head>
+<body>
+
+    <h2>Business Card Automation System</h2>
+    <div class="subtitle">CLINICAL CHIC VISUAL IDENTIFICATION SYSTEM</div>
+
+    <div class="container">
+        <div class="form-section">
+            <div class="form-group">
+                <label>1. Load Template Background</label>
+                <label for="pdf-file" class="file-custom-btn" id="pdf-status">📂 Import BA_Card_Background.pdf</label>
+                <input type="file" id="pdf-file" accept="application/pdf" style="display:none;">
+            </div>
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="input-name" value="Bo Chen, PhD">
+            </div>
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="input-title" value="Co-founder and CTO">
+            </div>
+            <div class="form-group">
+                <label>Phone</label>
+                <input type="text" id="input-phone" value="+1 (512)-363-0712">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="text" id="input-email" value="bo.c@bostonaesthetics.com">
+            </div>
+            <div class="form-group">
+                <label>Website</label>
+                <input type="text" id="input-website" value="bostonaesthetics.com">
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <input type="text" id="input-address" value="1 Peters Canyon, Suite 100, Irvine, CA 92606">
+            </div>
+            
+            <div class="btn-group">
+                <button id="download-pdf-btn" class="btn-print" onclick="exportToPDF()">🖨️ Export Print-Ready PDF</button>
+                <button id="download-longimg-btn" class="btn-print btn-secondary" onclick="exportToLongImage()">🖼️ Export Combined Long Image</button>
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <div style="width: 100%;">
+                <div class="card-title-tag">FRONT PREVIEW (Information Side)</div>
+                <div class="preview-wrapper">
+                    <img id="preview-front-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='455' height='260'><rect width='100%' height='100%' fill='%231a1a1a' /><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666666' font-size='13'>Please import the background PDF first</text></svg>">
+                </div>
+            </div>
+            
+            <div style="width: 100%;">
+                <div class="card-title-tag">BACK PREVIEW (Brand Side)</div>
+                <div class="preview-wrapper">
+                    <img id="preview-back-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='455' height='260'><rect width='100%' height='100%' fill='%231a1a1a' /><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666666' font-size='13'>Awaiting background rendering...</text></svg>">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas-front"></canvas>
+    <canvas id="canvas-back"></canvas>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+
+        let pdfDocInstance = null; 
+
+        const cFront = document.getElementById('canvas-front');
+        const ctxFront = cFront.getContext('2d');
+        const cBack = document.getElementById('canvas-back');
+        const ctxBack = cBack.getContext('2d');
+
+        const imgFront = document.getElementById('preview-front-img');
+        const imgBack = document.getElementById('preview-back-img');
+
+        const inputs = {
+            name: document.getElementById('input-name'),
+            title: document.getElementById('input-title'),
+            phone: document.getElementById('input-phone'),
+            email: document.getElementById('input-email'),
+            website: document.getElementById('input-website'),
+            address: document.getElementById('input-address')
+        };
+
+        // 矢量级微型图标渲染逻辑（全部变更为纯白色且对齐文本）
+        function drawIcon(ctx, type, x, y, size) {
+            ctx.strokeStyle = "#ffffff"; // 全部更改为纯白色
+            ctx.lineWidth = size / 8;
+            ctx.fillStyle = "none";
+            ctx.beginPath();
+            
+            if (type === 'phone') {
+                // 📞 传统电话听筒图标
+                ctx.arc(x + size/2, y + size/3, size/4, Math.PI, 0, false);
+                ctx.moveTo(x + size/4, y + size/3);
+                ctx.lineTo(x + size/4, y + size * 0.8);
+                ctx.lineTo(x + size * 0.75, y + size * 0.8);
+                ctx.lineTo(x + size * 0.75, y + size/3);
+            } else if (type === 'email') {
+                // ✉️ 邮箱图标
+                ctx.rect(x, y + size/6, size, size*0.7);
+                ctx.moveTo(x, y + size/6);
+                ctx.lineTo(x + size/2, y + size*0.55);
+                ctx.lineTo(x + size, y + size/6);
+            } else if (type === 'website') {
+                // 🌐 带有经纬线的地球仪图标
+                ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI*2);
+                ctx.stroke(); 
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y + size/2); ctx.lineTo(x + size, y + size/2);
+                ctx.moveTo(x + size/2, y); ctx.lineTo(x + size/2, y + size);
+                ctx.moveTo(x + size*0.2, y + size*0.15);
+                ctx.quadraticCurveTo(x + size*0.4, y + size/2, x + size*0.2, y + size*0.85);
+                ctx.moveTo(x + size*0.8, y + size*0.15);
+                ctx.quadraticCurveTo(x + size*0.6, y + size/2, x + size*0.8, y + size*0.85);
+            } else if (type === 'address') {
+                // 📍 定位针图标
+                ctx.arc(x + size/2, y + size/3, size/3, 0, Math.PI*2);
+                ctx.moveTo(x + size/2, y + size/3 - size/6);
+                ctx.arc(x + size/2, y + size/3, size/6, 0, Math.PI*2);
+                ctx.moveTo(x + size/2 - size/3, y + size/3);
+                ctx.lineTo(x + size/2, y + size);
+                ctx.lineTo(x + size/2 + size/3, y + size/3);
+            }
+            ctx.stroke();
+        }
+
+        function renderDoubleSided() {
+            if (!pdfDocInstance) return;
+
+            const s = 4; 
+            const canvasW = 455 * s; 
+            const canvasH = 260 * s;
+
+            cFront.width = canvasW; cFront.height = canvasH;
+            cBack.width = canvasW; cBack.height = canvasH;
+
+            pdfDocInstance.getPage(1).then(function(page) {
+                const viewport = page.getViewport({ scale: canvasW / page.getViewport({scale:1}).width });
+                page.render({ canvasContext: ctxFront, viewport: viewport }).promise.then(() => {
+                    
+                    // 姓名颜色：品牌绿
+                    ctxFront.fillStyle = "#3aae36";
+                    ctxFront.font = `bold ${20 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+                    ctxFront.textBaseline = "top";
+                    ctxFront.fillText(inputs.name.value, 35 * s, 36 * s);
+
+                    // 职称：改为纯白色
+                    ctxFront.fillStyle = "#ffffff";
+                    ctxFront.font = `300 ${10 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+                    ctxFront.fillText(inputs.title.value, 35 * s, 64 * s);
+
+                    // 联系信息：改为纯白色且保持放大字号
+                    ctxFront.fillStyle = "#ffffff";
+                    ctxFront.font = `300 ${11 * s}px Arial, Helvetica, sans-serif`;
+                    
+                    const startY = 148 * s;  
+                    const lineHeight = 16.5 * s; 
+                    const iconSize = 9.5 * s; 
+                    const textOffset = 16 * s; 
+                    const iconYOffset = 1.0 * s; // 经过微调的对齐偏置参数
+
+                    // 电话
+                    drawIcon(ctxFront, 'phone', 35 * s, startY + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.phone.value, (35 * s) + textOffset, startY);
+
+                    // 邮箱
+                    drawIcon(ctxFront, 'email', 35 * s, startY + lineHeight + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.email.value, (35 * s) + textOffset, startY + lineHeight);
+
+                    // 网址
+                    drawIcon(ctxFront, 'website', 35 * s, startY + (lineHeight * 2) + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.website.value, (35 * s) + textOffset, startY + (lineHeight * 2));
+
+                    // 地址
+                    drawIcon(ctxFront, 'address', 35 * s, startY + (lineHeight * 3) + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.address.value, (35 * s) + textOffset, startY + (lineHeight * 3));
+
+                    imgFront.src = cFront.toDataURL('image/png');
+                });
+            });
+
+            if (pdfDocInstance.numPages >= 2) {
+                pdfDocInstance.getPage(2).then(function(page) {
+                    const viewport = page.getViewport({ scale: canvasW / page.getViewport({scale:1}).width });
+                    page.render({ canvasContext: ctxBack, viewport: viewport }).promise.then(() => {
+                        imgBack.src = cBack.toDataURL('image/png');
+                    });
+                });
+            } else {
+                ctxBack.fillStyle = "#111111";
+                ctxBack.fillRect(0, 0, canvasW, canvasH);
+                imgBack.src = cBack.toDataURL('image/png');
+            }
+        }
+
+        function exportToLongImage() {
+            if (!pdfDocInstance) return alert("Please import the background PDF file first!");
+            
+            const longCanvas = document.createElement('canvas');
+            const longCtx = longCanvas.getContext('2d');
+            
+            longCanvas.width = cFront.width;
+            longCanvas.height = cFront.height * 2; 
+            
+            longCtx.drawImage(cFront, 0, 0);
+            longCtx.drawImage(cBack, 0, cFront.height);
+            
+            const link = document.createElement('a');
+            link.download = `BusinessCard_${inputs.name.value}_Combined.png`;
+            link.href = longCanvas.toDataURL('image/png');
+            link.click();
+        }
+
+        function exportToPDF() {
+            if (!pdfDocInstance) return alert("Please import the background PDF file first!");
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'landscape',
+                unit: 'in',
+                format: [3.5, 2.0]
+            });
+
+            const imgDataFront = cFront.toDataURL('image/jpeg', 1.0);
+            doc.addImage(imgDataFront, 'JPEG', 0, 0, 3.5, 2.0, undefined, 'FAST');
+
+            doc.addPage([3.5, 2.0], 'landscape');
+            const imgDataBack = cBack.toDataURL('image/jpeg', 1.0);
+            doc.addImage(imgDataBack, 'JPEG', 0, 0, 3.5, 2.0, undefined, 'FAST');
+
+            doc.save(`BusinessCard_${inputs.name.value}_Print.pdf`);
+        }
+
+        document.getElementById('pdf-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('pdf-status').textContent = "✅ Template Loaded Successfully";
+            const fileReader = new FileReader();
+            fileReader.onload = function() {
+                const typedarray = new Uint8Array(this.result);
+                pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
+                    pdfDocInstance = pdf;
+                    renderDoubleSided();
+                });
+            };
+            fileReader.readAsArrayBuffer(file);
+        });
+
+        Object.values(inputs).forEach(input => {
+            input.addEventListener('input', renderDoubleSided);
+        });
+    </script>
+</body>
+</html>
