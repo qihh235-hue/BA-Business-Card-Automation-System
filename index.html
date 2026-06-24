@@ -154,19 +154,19 @@
             </div>
             <div class="form-group">
                 <label>Name</label>
-                <input type="text" id="input-name" value="Bo Chen, PhD">
+                <input type="text" id="input-name" value="****** ****">
             </div>
             <div class="form-group">
                 <label>Title</label>
-                <input type="text" id="input-title" value="Co-founder and CTO">
+                <input type="text" id="input-title" value="CEO">
             </div>
             <div class="form-group">
                 <label>Phone</label>
-                <input type="text" id="input-phone" value="+1 (***)-***-****">
+                <input type="text" id="input-phone" value="+1 (***) ***–****">
             </div>
             <div class="form-group">
                 <label>Email</label>
-                <input type="text" id="input-email" value="**.*@bostonaesthetics.com">
+                <input type="text" id="input-email" value="*********@bostonaesthetics.com">
             </div>
             <div class="form-group">
                 <label>Website</label>
@@ -283,42 +283,45 @@
                 const viewport = page.getViewport({ scale: canvasW / page.getViewport({scale:1}).width });
                 page.render({ canvasContext: ctxFront, viewport: viewport }).promise.then(() => {
                     
+                    // 左侧和顶部的基础边距，微调对齐参考图
+                    const startX = 38 * s;
+
                     // 姓名颜色：品牌绿
                     ctxFront.fillStyle = "#3aae36";
-                    ctxFront.font = `bold ${20 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+                    ctxFront.font = `bold ${22 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
                     ctxFront.textBaseline = "top";
-                    ctxFront.fillText(inputs.name.value, 35 * s, 36 * s);
+                    ctxFront.fillText(inputs.name.value, startX, 42 * s);
 
-                    // 职称：改为纯白色
+                    // 职称：改为纯白色，调整上下垂直间距更紧凑
                     ctxFront.fillStyle = "#ffffff";
-                    ctxFront.font = `300 ${10 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-                    ctxFront.fillText(inputs.title.value, 35 * s, 64 * s);
+                    ctxFront.font = `300 ${11 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+                    ctxFront.fillText(inputs.title.value, startX, 70 * s);
 
-                    // 联系信息：改为纯白色且保持放大字号
+                    // 联系信息：整体向下移动，间距按参考图紧密排列
                     ctxFront.fillStyle = "#ffffff";
                     ctxFront.font = `300 ${11 * s}px Arial, Helvetica, sans-serif`;
                     
-                    const startY = 148 * s;  
+                    const startY = 158 * s;  // 整体下移
                     const lineHeight = 16.5 * s; 
                     const iconSize = 9.5 * s; 
-                    const textOffset = 16 * s; 
+                    const textOffset = 18 * s;  // 文字和图标增加少许距离
                     const iconYOffset = 1.0 * s; // 经过微调的对齐偏置参数
 
                     // 电话
-                    drawIcon(ctxFront, 'phone', 35 * s, startY + iconYOffset, iconSize);
-                    ctxFront.fillText(inputs.phone.value, (35 * s) + textOffset, startY);
+                    drawIcon(ctxFront, 'phone', startX, startY + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.phone.value, startX + textOffset, startY);
 
                     // 邮箱
-                    drawIcon(ctxFront, 'email', 35 * s, startY + lineHeight + iconYOffset, iconSize);
-                    ctxFront.fillText(inputs.email.value, (35 * s) + textOffset, startY + lineHeight);
+                    drawIcon(ctxFront, 'email', startX, startY + lineHeight + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.email.value, startX + textOffset, startY + lineHeight);
 
                     // 网址
-                    drawIcon(ctxFront, 'website', 35 * s, startY + (lineHeight * 2) + iconYOffset, iconSize);
-                    ctxFront.fillText(inputs.website.value, (35 * s) + textOffset, startY + (lineHeight * 2));
+                    drawIcon(ctxFront, 'website', startX, startY + (lineHeight * 2) + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.website.value, startX + textOffset, startY + (lineHeight * 2));
 
                     // 地址
-                    drawIcon(ctxFront, 'address', 35 * s, startY + (lineHeight * 3) + iconYOffset, iconSize);
-                    ctxFront.fillText(inputs.address.value, (35 * s) + textOffset, startY + (lineHeight * 3));
+                    drawIcon(ctxFront, 'address', startX, startY + (lineHeight * 3) + iconYOffset, iconSize);
+                    ctxFront.fillText(inputs.address.value, startX + textOffset, startY + (lineHeight * 3));
 
                     imgFront.src = cFront.toDataURL('image/png');
                 });
