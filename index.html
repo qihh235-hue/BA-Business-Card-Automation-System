@@ -286,11 +286,18 @@
                     // 左侧和顶部的基础边距，微调对齐参考图
                     const startX = 38 * s;
 
+                    // 动态计算名字字号：如果超过20个字符，降低字号大小
+                    const nameString = inputs.name.value;
+                    let nameFontSize = 22 * s; 
+                    if (nameString.length > 20) {
+                        nameFontSize = 16.5 * s; // 超过20字符自动缩小字号
+                    }
+
                     // 姓名颜色：品牌绿
                     ctxFront.fillStyle = "#3aae36";
-                    ctxFront.font = `bold ${22 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+                    ctxFront.font = `bold ${nameFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
                     ctxFront.textBaseline = "top";
-                    ctxFront.fillText(inputs.name.value, startX, 42 * s);
+                    ctxFront.fillText(nameString, startX, 42 * s);
 
                     // 职称：改为纯白色，调整上下垂直间距更紧凑
                     ctxFront.fillStyle = "#ffffff";
