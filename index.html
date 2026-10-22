@@ -299,10 +299,26 @@
                     ctxFront.textBaseline = "top";
                     ctxFront.fillText(nameString, startX, 42 * s);
 
-                    // 职称：改为纯白色，调整上下垂直间距更紧凑
+                    // 职称：改为纯白色，超过三个单词自动换行（每3个单词一行）
                     ctxFront.fillStyle = "#ffffff";
                     ctxFront.font = `300 ${11 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-                    ctxFront.fillText(inputs.title.value, startX, 70 * s);
+                    
+                    const titleRaw = inputs.title.value.trim();
+                    const words = titleRaw.length > 0 ? titleRaw.split(/\s+/) : [];
+                    const titleStartY = 70 * s;
+                    const titleLineHeight = 14 * s;
+
+                    if (words.length > 3) {
+                        const lines = [];
+                        for (let i = 0; i < words.length; i += 3) {
+                            lines.push(words.slice(i, i + 3).join(" "));
+                        }
+                        lines.forEach((line, index) => {
+                            ctxFront.fillText(line, startX, titleStartY + (index * titleLineHeight));
+                        });
+                    } else {
+                        ctxFront.fillText(titleRaw, startX, titleStartY);
+                    }
 
                     // 联系信息：整体向下移动，间距按参考图紧密排列
                     ctxFront.fillStyle = "#ffffff";
