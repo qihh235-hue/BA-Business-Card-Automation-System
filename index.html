@@ -112,8 +112,21 @@
             height: 100%;
             display: block;
         }
-        
-        canvas { display: none; }
+        #preview-front-wrapper { cursor: grab; }
+
+        .preview-wrapper canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .file-custom-btn.drop-hover {
+            border-color: #00bc5d;
+            background: #233b2d;
+        }
         
         .btn-group {
             display: flex;
@@ -152,9 +165,16 @@
                 <label for="pdf-file" class="file-custom-btn" id="pdf-status">📂 Import BA_Card_Background.pdf</label>
                 <input type="file" id="pdf-file" accept="application/pdf" style="display:none;">
             </div>
+            
+            <div class="form-group">
+                <label>2. Load Headshot Photo</label>
+                <label for="avatar-file" class="file-custom-btn" id="avatar-status">👤 Upload Avatar Photo</label>
+                <input type="file" id="avatar-file" accept="image/*" style="display:none;">
+            </div>
+
             <div class="form-group">
                 <label>Name</label>
-                <input type="text" id="input-name" value="****** ****">
+                <input type="text" id="input-name" value="Brandon Nye">
             </div>
             <div class="form-group">
                 <label>Title</label>
@@ -162,11 +182,11 @@
             </div>
             <div class="form-group">
                 <label>Phone</label>
-                <input type="text" id="input-phone" value="+1 (***) ***–****">
+                <input type="text" id="input-phone" value="(704) 728-7523">
             </div>
             <div class="form-group">
                 <label>Email</label>
-                <input type="text" id="input-email" value="*********@bostonaesthetics.com">
+                <input type="text" id="input-email" value="brandon.n@bostonaesthetics.com">
             </div>
             <div class="form-group">
                 <label>Website</label>
@@ -186,32 +206,43 @@
         <div class="preview-section">
             <div style="width: 100%;">
                 <div class="card-title-tag">FRONT PREVIEW (Information Side)</div>
-                <div class="preview-wrapper">
+                <div class="preview-wrapper" id="preview-front-wrapper">
                     <img id="preview-front-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='455' height='260'><rect width='100%' height='100%' fill='%231a1a1a' /><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666666' font-size='13'>Please import the background PDF first</text></svg>">
+                    <canvas id="canvas-front"></canvas>
                 </div>
             </div>
             
             <div style="width: 100%;">
                 <div class="card-title-tag">BACK PREVIEW (Brand Side)</div>
-                <div class="preview-wrapper">
+                <div class="preview-wrapper" id="preview-back-wrapper">
                     <img id="preview-back-img" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='455' height='260'><rect width='100%' height='100%' fill='%231a1a1a' /><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23666666' font-size='13'>Awaiting background rendering...</text></svg>">
+                    <canvas id="canvas-back"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <canvas id="canvas-front"></canvas>
-    <canvas id="canvas-back"></canvas>
-
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
-        let pdfDocInstance = null; 
+        let pdfDocInstance = null;
+        let avatarImageObj = null;
+        // 用户头像调整状态：scale = 缩放倍率，offsetX/Y = 画布像素位移（默认值与原始渲染完全一致）
+        let avatarAdjust = { scale: 1, offsetX: 0, offsetY: 0 };
 
         const cFront = document.getElementById('canvas-front');
         const ctxFront = cFront.getContext('2d');
         const cBack = document.getElementById('canvas-back');
         const ctxBack = cBack.getContext('2d');
+
+        // PDF 背景缓存：模板只在加载/更换时渲染一次，交互调整时直接合成，保证拖拽/缩放流畅
+        const bgFrontCanvas = document.createElement('canvas');
+        const ctxBgFront = bgFrontCanvas.getContext('2d');
+        const bgBackCanvas = document.createElement('canvas');
+        const ctxBgBack = bgBackCanvas.getContext('2d');
+        let bgFrontReady = false;
+
+        const wrapperFront = document.getElementById('preview-front-wrapper');
 
         const imgFront = document.getElementById('preview-front-img');
         const imgBack = document.getElementById('preview-back-img');
@@ -225,88 +256,122 @@
             address: document.getElementById('input-address')
         };
 
-        // 矢量级微型图标渲染逻辑（全部变更为纯白色且对齐文本）
+        // 矢量级微型图标渲染逻辑（图标颜色为 #3aae36 品牌绿）
         function drawIcon(ctx, type, x, y, size) {
-            ctx.strokeStyle = "#ffffff"; // 全部更改为纯白色
-            ctx.lineWidth = size / 8;
-            ctx.fillStyle = "none";
-            ctx.beginPath();
+            ctx.strokeStyle = "#3aae36"; 
+            ctx.fillStyle = "#3aae36";
             
             if (type === 'phone') {
-                // 📞 传统电话听筒图标
-                ctx.arc(x + size/2, y + size/3, size/4, Math.PI, 0, false);
-                ctx.moveTo(x + size/4, y + size/3);
-                ctx.lineTo(x + size/4, y + size * 0.8);
-                ctx.lineTo(x + size * 0.75, y + size * 0.8);
-                ctx.lineTo(x + size * 0.75, y + size/3);
-            } else if (type === 'email') {
-                // ✉️ 邮箱图标
-                ctx.rect(x, y + size/6, size, size*0.7);
-                ctx.moveTo(x, y + size/6);
-                ctx.lineTo(x + size/2, y + size*0.55);
-                ctx.lineTo(x + size, y + size/6);
-            } else if (type === 'website') {
-                // 🌐 带有经纬线的地球仪图标
-                ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI*2);
-                ctx.stroke(); 
-                
+                ctx.save();
+                const pathStr = "M752.881664 1024c-66.064384 0-151.355392-44.009472-211.273728-80.941056-80.242688-49.444864-166.68672-117.85216-243.41504-192.608256l-0.27648-0.27648-24.363008-24.367104c-74.760192-76.722176-143.161344-163.172352-192.6144-243.41504C44.015616 422.473728 0 337.18272 0 271.118336c0-70.69696 50.55488-145.73568 72.290304-174.712832C89.249792 73.791488 148.504576 0 198.85056 0c20.67456 0 42.938368 13.531136 72.198144 43.876352 25.880576 26.830848 50.714624 60.184576 66.988032 83.439616 21.858304 31.22176 42.070016 63.911936 56.92416 92.053504 24.049664 45.561856 26.832896 65.099776 26.832896 75.833344 0 21.661696-11.3152 40.450048-33.624064 55.83872-14.690304 10.131456-32.323584 17.760256-49.375232 25.141248-11.501568 4.974592-29.868032 12.914688-36.872192 18.499584 2.445312 10.350592 13.125632 35.34848 41.996288 77.73184 26.90048 39.491584 61.68576 82.290688 93.110272 114.563072 32.26624 31.420416 75.0592 66.209792 114.563072 93.110272 42.371072 28.85632 67.36896 39.542784 77.727744 41.990144 5.578752-7.00416 13.524992-25.36448 18.499584-36.866048 7.374848-17.055744 15.0016-34.691072 25.141248-49.381376 15.388672-22.308864 34.177024-33.61792 55.83872-33.61792 10.733568 0 30.271488 2.781184 75.839488 26.826752 28.135424 14.854144 60.831744 35.065856 92.049408 56.92416 23.25504 16.279552 56.60672 41.1136 83.443712 66.988032C1010.468864 782.211072 1024 804.47488 1024 825.14944c0 50.345984-73.785344 109.600768-96.39936 126.560256C898.617344 973.44512 823.578624 1024 752.881664 1024L752.881664 1024zM340.529152 707.278848c73.607168 71.702528 156.27264 137.148416 232.804352 184.30976 74.194944 45.725696 139.640832 71.950336 179.550208 71.950336 35.551232 0 86.23104-21.712896 135.579648-58.07104 21.633024-15.94368 41.322496-33.69984 55.441408-49.993728 13.248512-15.296512 18.092032-25.274368 19.320832-29.300736-5.117952-10.99776-35.528704-45.387776-106.504192-94.349312-27.84256-19.204096-56.623104-36.85376-81.0496-49.692672-30.6688-16.123904-43.450368-18.909184-46.37696-19.365888-1.13664 0.780288-4.476928 3.571712-9.555968 12.0832-5.6832 9.531392-11.147264 22.163456-16.427008 34.373632-6.5024 15.038464-13.232128 30.588928-21.48352 43.134976-13.416448 20.40832-29.89056 30.76096-48.959488 30.773248-0.346112 0-0.704512-0.006144-1.073152-0.018432-9.27744-0.196608-37.535744-0.796672-114.24768-53.041152-42.346496-28.852224-88.336384-66.254848-123.004928-100.069376l-0.54272-0.536576c-33.808384-34.678784-71.211008-80.662528-100.059136-123.004928-52.250624-76.711936-52.854784-104.968192-53.051392-114.251776-0.415744-19.417088 9.834496-36.179968 30.451712-49.831936 12.607488-8.3456 28.284928-15.12448 43.444224-21.686272 12.214272-5.279744 24.840192-10.745856 34.373632-16.422912 8.511488-5.072896 11.311104-8.419328 12.0832-9.555968-0.456704-2.926592-3.241984-15.706112-19.36384-46.37696-12.838912-24.420352-30.490624-53.20704-49.69472-81.043456-48.961536-70.981632-83.351552-101.390336-94.349312-106.508288-4.028416 1.232896-14.006272 6.076416-29.302784 19.324928-16.295936 14.112768-34.050048 33.806336-49.987584 55.441408-36.364288 49.342464-58.07104 100.022272-58.07104 135.573504 0 39.907328 26.220544 105.34912 71.944192 179.550208 47.16544 76.531712 112.613376 159.197184 184.30976 232.804352L340.529152 707.278848 340.529152 707.278848zM340.529152 707.278848";
+                const p = new Path2D(pathStr);
+                const scale = size / 1024;
+                ctx.translate(x, y);
+                ctx.scale(scale, scale);
+                ctx.fill(p);
+                ctx.restore();
+            } else {
+                ctx.lineWidth = size / 14;
                 ctx.beginPath();
-                ctx.moveTo(x, y + size/2); ctx.lineTo(x + size, y + size/2);
-                ctx.moveTo(x + size/2, y); ctx.lineTo(x + size/2, y + size);
-                ctx.moveTo(x + size*0.2, y + size*0.15);
-                ctx.quadraticCurveTo(x + size*0.4, y + size/2, x + size*0.2, y + size*0.85);
-                ctx.moveTo(x + size*0.8, y + size*0.15);
-                ctx.quadraticCurveTo(x + size*0.6, y + size/2, x + size*0.8, y + size*0.85);
-            } else if (type === 'address') {
-                // 📍 定位针图标
-                ctx.arc(x + size/2, y + size/3, size/3, 0, Math.PI*2);
-                ctx.moveTo(x + size/2, y + size/3 - size/6);
-                ctx.arc(x + size/2, y + size/3, size/6, 0, Math.PI*2);
-                ctx.moveTo(x + size/2 - size/3, y + size/3);
-                ctx.lineTo(x + size/2, y + size);
-                ctx.lineTo(x + size/2 + size/3, y + size/3);
+                if (type === 'email') {
+                    ctx.rect(x, y + size/6, size, size*0.7);
+                    ctx.moveTo(x, y + size/6);
+                    ctx.lineTo(x + size/2, y + size*0.55);
+                    ctx.lineTo(x + size, y + size/6);
+                } else if (type === 'website') {
+                    ctx.arc(x + size/2, y + size/2, size/2, 0, Math.PI*2);
+                    ctx.stroke(); 
+                    ctx.beginPath();
+                    ctx.moveTo(x, y + size/2); ctx.lineTo(x + size, y + size/2);
+                    ctx.moveTo(x + size/2, y); ctx.lineTo(x + size/2, y + size);
+                    ctx.moveTo(x + size*0.2, y + size*0.15);
+                    ctx.quadraticCurveTo(x + size*0.4, y + size/2, x + size*0.2, y + size*0.85);
+                    ctx.moveTo(x + size*0.8, y + size*0.15);
+                    ctx.quadraticCurveTo(x + size*0.6, y + size/2, x + size*0.8, y + size*0.85);
+                } else if (type === 'address') {
+                    ctx.arc(x + size/2, y + size/3, size/3, 0, Math.PI*2);
+                    ctx.moveTo(x + size/2, y + size/3 - size/6);
+                    ctx.arc(x + size/2, y + size/3, size/6, 0, Math.PI*2);
+                    ctx.moveTo(x + size/2 - size/3, y + size/3);
+                    ctx.lineTo(x + size/2, y + size);
+                    ctx.lineTo(x + size/2 + size/3, y + size/3);
+                }
+                ctx.stroke();
             }
-            ctx.stroke();
         }
 
-        function renderDoubleSided() {
-            if (!pdfDocInstance) return;
-
-            const s = 4; 
-            const canvasW = 455 * s; 
-            const canvasH = 260 * s;
-
-            cFront.width = canvasW; cFront.height = canvasH;
-            cBack.width = canvasW; cBack.height = canvasH;
-
-            pdfDocInstance.getPage(1).then(function(page) {
-                const viewport = page.getViewport({ scale: canvasW / page.getViewport({scale:1}).width });
-                page.render({ canvasContext: ctxFront, viewport: viewport }).promise.then(() => {
+        // 前景内容（绘制在 PDF 背景之上）：头像底座 + 头像 + 文字图标，绘制顺序与原版完全一致
+        function drawFrontContent() {
+            const s = 4;
                     
-                    // 左侧和顶部的基础边距，微调对齐参考图
-                    const startX = 38 * s;
+                    // 1. 右上角白灰色头像方块底座
+                    const avatarBoxX = 328 * s;
+                    const avatarBoxY = 32 * s;
+                    const avatarBoxW = 92 * s;
+                    const avatarBoxH = 92 * s;
 
-                    // 动态计算名字字号：如果超过20个字符，降低字号大小
-                    const nameString = inputs.name.value;
-                    let nameFontSize = 22 * s; 
-                    if (nameString.length > 20) {
-                        nameFontSize = 16.5 * s; // 超过20字符自动缩小字号
+                    ctxFront.fillStyle = "#cccccc"; 
+                    ctxFront.fillRect(avatarBoxX, avatarBoxY, avatarBoxW, avatarBoxH);
+
+                    // 2. 头像自动缩放填充
+                    if (avatarImageObj) {
+                        ctxFront.save();
+                        ctxFront.beginPath();
+                        ctxFront.rect(avatarBoxX, avatarBoxY, avatarBoxW, avatarBoxH);
+                        ctxFront.clip();
+
+                        const imgRatio = avatarImageObj.width / avatarImageObj.height;
+                        let drawW, drawH, drawX, drawY;
+                        const scaleFactor = 1.08;
+
+                        if (imgRatio > 1) {
+                            drawH = avatarBoxH * scaleFactor;
+                            drawW = drawH * imgRatio;
+                            drawX = avatarBoxX - (drawW - avatarBoxW) / 2;
+                            drawY = avatarBoxY - (drawH - avatarBoxH) / 2 - (6 * s);
+                        } else {
+                            drawW = avatarBoxW * scaleFactor;
+                            drawH = drawW / imgRatio;
+                            drawX = avatarBoxX - (drawW - avatarBoxW) / 2;
+                            drawY = avatarBoxY - (drawH - avatarBoxH) / 2 - (12 * s);
+                        }
+
+                        // 应用用户缩放与位移（默认 scale=1, offset=0 时与原始布局完全一致）
+                        const baseCenterX = drawX + drawW / 2 + avatarAdjust.offsetX;
+                        const baseCenterY = drawY + drawH / 2 + avatarAdjust.offsetY;
+                        drawW *= avatarAdjust.scale;
+                        drawH *= avatarAdjust.scale;
+                        drawX = baseCenterX - drawW / 2;
+                        drawY = baseCenterY - drawH / 2;
+
+                        ctxFront.drawImage(avatarImageObj, drawX, drawY, drawW, drawH);
+                        ctxFront.restore();
                     }
 
-                    // 姓名颜色：品牌绿
+                    // 3. 左侧文字区域
+                    const startX = 38 * s;
+
+                    // 姓名字号
+                    const nameString = inputs.name.value;
+                    let nameFontSize = 28 * s; 
+                    if (nameString.length > 20) {
+                        nameFontSize = 21 * s;
+                    }
+
                     ctxFront.fillStyle = "#3aae36";
                     ctxFront.font = `bold ${nameFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
                     ctxFront.textBaseline = "top";
-                    ctxFront.fillText(nameString, startX, 42 * s);
+                    ctxFront.fillText(nameString, startX, 36 * s);
 
-                    // 职称：改为纯白色，超过三个单词自动换行（每3个单词一行）
+                    // 职称字号 + 超过三个单词自动换行
                     ctxFront.fillStyle = "#ffffff";
-                    ctxFront.font = `300 ${11 * s}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+                    const titleFontSize = 16 * s;
+                    ctxFront.font = `300 ${titleFontSize}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
                     
                     const titleRaw = inputs.title.value.trim();
                     const words = titleRaw.length > 0 ? titleRaw.split(/\s+/) : [];
-                    const titleStartY = 70 * s;
-                    const titleLineHeight = 14 * s;
+                    const titleStartY = 73 * s;
+                    const titleLineHeight = 20 * s;
 
                     if (words.length > 3) {
                         const lines = [];
@@ -320,48 +385,85 @@
                         ctxFront.fillText(titleRaw, startX, titleStartY);
                     }
 
-                    // 联系信息：整体向下移动，间距按参考图紧密排列
-                    ctxFront.fillStyle = "#ffffff";
-                    ctxFront.font = `300 ${11 * s}px Arial, Helvetica, sans-serif`;
+                    // 详细联系信息（文字颜色恢复为白色）
+                    const infoFontSize = 16 * s;
+                    ctxFront.font = `300 ${infoFontSize}px Arial, Helvetica, sans-serif`;
                     
-                    const startY = 158 * s;  // 整体下移
-                    const lineHeight = 16.5 * s; 
-                    const iconSize = 9.5 * s; 
-                    const textOffset = 18 * s;  // 文字和图标增加少许距离
-                    const iconYOffset = 1.0 * s; // 经过微调的对齐偏置参数
+                    const startY = 148 * s;  
+                    const lineHeight = 21 * s; 
+                    const iconSize = 14 * s; 
+                    const textOffset = 23 * s;  
+                    const iconYOffset = 0.5 * s; 
 
                     // 电话
                     drawIcon(ctxFront, 'phone', startX, startY + iconYOffset, iconSize);
+                    ctxFront.fillStyle = "#ffffff";
                     ctxFront.fillText(inputs.phone.value, startX + textOffset, startY);
 
                     // 邮箱
                     drawIcon(ctxFront, 'email', startX, startY + lineHeight + iconYOffset, iconSize);
+                    ctxFront.fillStyle = "#ffffff";
                     ctxFront.fillText(inputs.email.value, startX + textOffset, startY + lineHeight);
 
                     // 网址
                     drawIcon(ctxFront, 'website', startX, startY + (lineHeight * 2) + iconYOffset, iconSize);
+                    ctxFront.fillStyle = "#ffffff";
                     ctxFront.fillText(inputs.website.value, startX + textOffset, startY + (lineHeight * 2));
 
                     // 地址
                     drawIcon(ctxFront, 'address', startX, startY + (lineHeight * 3) + iconYOffset, iconSize);
+                    ctxFront.fillStyle = "#ffffff";
                     ctxFront.fillText(inputs.address.value, startX + textOffset, startY + (lineHeight * 3));
 
-                    imgFront.src = cFront.toDataURL('image/png');
+        }
+
+        // 快速合成：复用缓存的 PDF 背景，仅重绘前景层（拖拽/缩放每帧调用，流畅的关键）
+        function compositeFront() {
+            ctxFront.clearRect(0, 0, cFront.width, cFront.height);
+            ctxFront.drawImage(bgFrontCanvas, 0, 0);
+            drawFrontContent();
+        }
+
+        function renderDoubleSided() {
+            if (!pdfDocInstance) return Promise.resolve();
+
+            const s = 4;
+            const canvasW = 455 * s;
+            const canvasH = 260 * s;
+
+            cFront.width = canvasW; cFront.height = canvasH;
+            cBack.width = canvasW; cBack.height = canvasH;
+            bgFrontCanvas.width = canvasW; bgFrontCanvas.height = canvasH;
+            bgBackCanvas.width = canvasW; bgBackCanvas.height = canvasH;
+            bgFrontReady = false;
+
+            const frontJob = pdfDocInstance.getPage(1).then(function(page) {
+                const viewport = page.getViewport({ scale: canvasW / page.getViewport({scale:1}).width });
+                return page.render({ canvasContext: ctxBgFront, viewport: viewport }).promise.then(() => {
+                    bgFrontReady = true;
+                    compositeFront();
                 });
             });
 
+            let backJob;
             if (pdfDocInstance.numPages >= 2) {
-                pdfDocInstance.getPage(2).then(function(page) {
+                backJob = pdfDocInstance.getPage(2).then(function(page) {
                     const viewport = page.getViewport({ scale: canvasW / page.getViewport({scale:1}).width });
-                    page.render({ canvasContext: ctxBack, viewport: viewport }).promise.then(() => {
-                        imgBack.src = cBack.toDataURL('image/png');
+                    return page.render({ canvasContext: ctxBgBack, viewport: viewport }).promise.then(() => {
+                        ctxBack.clearRect(0, 0, canvasW, canvasH);
+                        ctxBack.drawImage(bgBackCanvas, 0, 0);
                     });
                 });
             } else {
                 ctxBack.fillStyle = "#111111";
                 ctxBack.fillRect(0, 0, canvasW, canvasH);
-                imgBack.src = cBack.toDataURL('image/png');
+                backJob = Promise.resolve();
             }
+
+            return Promise.all([frontJob, backJob]).catch(function(err) {
+                // 渲染被新帧取代时忽略瞬时冲突
+                console.warn('Render skipped:', err);
+            });
         }
 
         function exportToLongImage() {
@@ -417,8 +519,140 @@
             fileReader.readAsArrayBuffer(file);
         });
 
+        document.getElementById('avatar-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('avatar-status').textContent = "✅ Headshot Loaded";
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    avatarImageObj = img;
+                    avatarAdjust = { scale: 1, offsetX: 0, offsetY: 0 }; // 换新头像时重置调整状态
+                    renderDoubleSided();
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // ===== 头像交互调整：滚轮缩放 + 按住拖拽移动位置 =====
+        const AVATAR_MIN_SCALE = 0.3;
+        const AVATAR_MAX_SCALE = 6;
+        const AVATAR_ZOOM_STEP = 1.06;
+
+        let renderBusy = false;
+        let renderQueued = false;
+        let avatarDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let dragBaseOffX = 0, dragBaseOffY = 0;
+
+        // 交互时的重绘调度：背景已缓存时走快速合成路径，无需重新渲染 PDF
+        function requestRender() {
+            if (renderBusy) { renderQueued = true; return; }
+            if (bgFrontReady) { compositeFront(); return; }
+            renderBusy = true;
+            Promise.resolve(renderDoubleSided()).then(function() {
+                renderBusy = false;
+                if (renderQueued) { renderQueued = false; requestRender(); }
+            });
+        }
+
+        // 预览坐标 -> 画布坐标 换算系数
+        function previewToCanvasFactor() {
+            const rect = wrapperFront.getBoundingClientRect();
+            return rect.width > 0 ? cFront.width / rect.width : 1;
+        }
+
+        wrapperFront.addEventListener('wheel', function(e) {
+            if (!avatarImageObj || !pdfDocInstance) return;
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? AVATAR_ZOOM_STEP : 1 / AVATAR_ZOOM_STEP;
+            avatarAdjust.scale = Math.min(AVATAR_MAX_SCALE, Math.max(AVATAR_MIN_SCALE, avatarAdjust.scale * zoomFactor));
+            requestRender();
+        }, { passive: false });
+
+        wrapperFront.addEventListener('mousedown', function(e) {
+            if (!avatarImageObj || !pdfDocInstance) return;
+            avatarDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            dragBaseOffX = avatarAdjust.offsetX;
+            dragBaseOffY = avatarAdjust.offsetY;
+            wrapperFront.style.cursor = 'grabbing';
+            e.preventDefault();
+        });
+
+        window.addEventListener('mousemove', function(e) {
+            if (!avatarDragging) return;
+            const f = previewToCanvasFactor();
+            avatarAdjust.offsetX = dragBaseOffX + (e.clientX - dragStartX) * f;
+            avatarAdjust.offsetY = dragBaseOffY + (e.clientY - dragStartY) * f;
+            requestRender();
+        });
+
+        window.addEventListener('mouseup', function() {
+            if (!avatarDragging) return;
+            avatarDragging = false;
+            wrapperFront.style.cursor = 'grab';
+        });
+
         Object.values(inputs).forEach(input => {
-            input.addEventListener('input', renderDoubleSided);
+            input.addEventListener('input', function() {
+                requestRender(); // 背景已缓存时直接快速合成，输入更跟手
+            });
+        });
+
+        // ===== 支持将文件直接拖拽到加载框 =====
+        function setupDropZone(boxEl, inputEl, validate) {
+            ['dragenter', 'dragover'].forEach(function(evtName) {
+                boxEl.addEventListener(evtName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    boxEl.classList.add('drop-hover');
+                });
+            });
+            boxEl.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                boxEl.classList.remove('drop-hover');
+            });
+            boxEl.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                boxEl.classList.remove('drop-hover');
+                const file = e.dataTransfer.files && e.dataTransfer.files[0];
+                if (!file) return;
+                const error = validate(file);
+                if (error) return alert(error);
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                inputEl.files = dt.files;
+                inputEl.dispatchEvent(new Event('change')); // 复用现有的文件处理逻辑
+            });
+        }
+
+        setupDropZone(
+            document.getElementById('pdf-status'),
+            document.getElementById('pdf-file'),
+            function(file) {
+                return (file.type === 'application/pdf' || /\.pdf$/i.test(file.name))
+                    ? null : "Please drop a PDF file.";
+            }
+        );
+
+        setupDropZone(
+            document.getElementById('avatar-status'),
+            document.getElementById('avatar-file'),
+            function(file) {
+                return file.type.startsWith('image/')
+                    ? null : "Please drop an image file.";
+            }
+        );
+
+        // 防止文件被拖到加载框以外时浏览器直接打开文件
+        ['dragover', 'drop'].forEach(function(evtName) {
+            window.addEventListener(evtName, function(e) { e.preventDefault(); });
         });
     </script>
 </body>
