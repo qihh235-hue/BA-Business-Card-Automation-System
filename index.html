@@ -151,6 +151,105 @@
         .btn-print:hover { background: #009a4c; }
         .btn-secondary { background: #3a3a3a; }
         .btn-secondary:hover { background: #4a4a4a; }
+
+        /* ===== 存档功能样式 ===== */
+        .archive-section {
+            margin-top: 15px;
+            border-top: 1px solid #333;
+            padding-top: 15px;
+        }
+        .archive-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .archive-title {
+            font-size: 11px;
+            color: #888888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        .btn-archive {
+            background: #2a5298;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: background 0.2s;
+        }
+        .btn-archive:hover { background: #1e3d73; }
+        .archive-list {
+            max-height: 200px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .archive-item {
+            background: #252525;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .archive-item:hover {
+            background: #2d2d2d;
+            border-color: #2a5298;
+        }
+        .archive-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .archive-item-name {
+            font-size: 14px;
+            color: #ffffff;
+            font-weight: bold;
+        }
+        .archive-item-date {
+            font-size: 11px;
+            color: #888888;
+        }
+        .archive-item-title {
+            font-size: 11px;
+            color: #aaaaaa;
+        }
+        .btn-archive-delete {
+            background: transparent;
+            border: 1px solid #555;
+            color: #888;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-archive-delete:hover {
+            background: #5a1a1a;
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+        .archive-empty {
+            text-align: center;
+            color: #666666;
+            font-size: 12px;
+            padding: 20px 0;
+        }
+        .archive-count {
+            font-size: 11px;
+            color: #666666;
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -200,6 +299,18 @@
             <div class="btn-group">
                 <button id="download-pdf-btn" class="btn-print" onclick="exportToPDF()">🖨️ Export Print-Ready PDF</button>
                 <button id="download-longimg-btn" class="btn-print btn-secondary" onclick="exportToLongImage()">🖼️ Export Combined Long Image</button>
+            </div>
+
+            <!-- 存档功能区域 -->
+            <div class="archive-section">
+                <div class="archive-header">
+                    <span class="archive-title">💾 Card Archives</span>
+                    <button class="btn-archive" onclick="saveCurrentCard()">📁 Save Current Card</button>
+                </div>
+                <div class="archive-count" id="archive-count"></div>
+                <div class="archive-list" id="archive-list">
+                    <div class="archive-empty">No archived cards yet</div>
+                </div>
             </div>
         </div>
 
@@ -511,6 +622,7 @@
             const fileReader = new FileReader();
             fileReader.onload = function() {
                 const typedarray = new Uint8Array(this.result);
+                currentPdfArrayBuffer = this.result; // 保存ArrayBuffer供存档使用
                 pdfjsLib.getDocument(typedarray).promise.then(function(pdf) {
                     pdfDocInstance = pdf;
                     renderDoubleSided();
@@ -653,6 +765,324 @@
         // 防止文件被拖到加载框以外时浏览器直接打开文件
         ['dragover', 'drop'].forEach(function(evtName) {
             window.addEventListener(evtName, function(e) { e.preventDefault(); });
+        });
+
+        // ===== 名片存档功能 (使用 IndexedDB 存储，支持大文件) =====
+        const DB_NAME = 'BusinessCardDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'archives';
+        let dbInstance = null;
+
+        // 初始化/打开 IndexedDB
+        function initDB() {
+            return new Promise(function(resolve, reject) {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = function() {
+                    console.error('Error opening database:', request.error);
+                    reject(request.error);
+                };
+
+                request.onsuccess = function() {
+                    dbInstance = request.result;
+                    resolve(dbInstance);
+                };
+
+                request.onupgradeneeded = function(event) {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+
+        // 获取所有存档
+        function getArchives() {
+            return new Promise(function(resolve, reject) {
+                if (!dbInstance) {
+                    resolve([]);
+                    return;
+                }
+                const transaction = dbInstance.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+
+                request.onsuccess = function() {
+                    // 按 savedAt 降序排列（最新的在前）
+                    const archives = request.result.sort(function(a, b) {
+                        return new Date(b.savedAt) - new Date(a.savedAt);
+                    });
+                    resolve(archives);
+                };
+
+                request.onerror = function() {
+                    console.error('Error getting archives:', request.error);
+                    resolve([]);
+                }
+            });
+        }
+
+        // 保存单个存档
+        function saveArchive(archive) {
+            return new Promise(function(resolve, reject) {
+                if (!dbInstance) {
+                    reject(new Error('Database not initialized'));
+                    return;
+                }
+                const transaction = dbInstance.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put(archive);
+
+                request.onsuccess = function() {
+                    resolve();
+                };
+
+                request.onerror = function() {
+                    console.error('Error saving archive:', request.error);
+                    reject(request.error);
+                };
+            });
+        }
+
+        // 删除单个存档
+        function deleteArchive(id) {
+            return new Promise(function(resolve, reject) {
+                if (!dbInstance) {
+                    reject(new Error('Database not initialized'));
+                    return;
+                }
+                const transaction = dbInstance.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.delete(id);
+
+                request.onsuccess = function() {
+                    resolve();
+                };
+
+                request.onerror = function() {
+                    console.error('Error deleting archive:', request.error);
+                    reject(request.error);
+                };
+            });
+        }
+
+        // 获取头像的Data URL（保持原始格式和大小）
+        function getAvatarDataUrl() {
+            if (!avatarImageObj) return null;
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = avatarImageObj.width;
+                canvas.height = avatarImageObj.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(avatarImageObj, 0, 0);
+                return canvas.toDataURL('image/png');
+            } catch (e) {
+                console.error('Error getting avatar data:', e);
+                return null;
+            }
+        }
+
+        // HTML转义防止XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 保存当前名片到存档（主函数）- 使用 IndexedDB 异步存储
+        async function saveCurrentCard() {
+            console.log('saveCurrentCard called');
+
+            // 验证姓名
+            if (!inputs || !inputs.name) {
+                alert('Error: Form inputs not found. Please refresh the page.');
+                return;
+            }
+
+            if (!inputs.name.value.trim()) {
+                alert('Please enter a name before saving.');
+                return;
+            }
+
+            try {
+                // 确保数据库已初始化
+                if (!dbInstance) {
+                    await initDB();
+                }
+
+                const archive = {
+                    id: Date.now(),
+                    name: inputs.name.value.trim(),
+                    title: inputs.title.value.trim(),
+                    phone: inputs.phone.value.trim(),
+                    email: inputs.email.value.trim(),
+                    website: inputs.website.value.trim(),
+                    address: inputs.address.value.trim(),
+                    avatarAdjust: avatarAdjust ? { scale: avatarAdjust.scale, offsetX: avatarAdjust.offsetX, offsetY: avatarAdjust.offsetY } : { scale: 1, offsetX: 0, offsetY: 0 },
+                    avatarDataUrl: getAvatarDataUrl(), // 原始质量的头像
+                    savedAt: new Date().toISOString()
+                };
+
+                console.log('Creating archive for:', archive.name);
+
+                // 检查是否已存在相同姓名的存档
+                const archives = await getArchives();
+                const existingIndex = archives.findIndex(a => a.name === archive.name && a.title === archive.title);
+
+                if (existingIndex >= 0) {
+                    if (!confirm(`A card for "${archive.name}" already exists. Overwrite it?`)) {
+                        console.log('Save cancelled by user');
+                        return;
+                    }
+                    archive.id = archives[existingIndex].id; // 保持原ID以便更新
+                    console.log('Overwriting existing archive');
+                } else {
+                    console.log('Adding new archive');
+                }
+
+                await saveArchive(archive);
+                await renderArchiveListAsync();
+                alert(`Card for "${archive.name}" saved successfully!`);
+                console.log('Save completed successfully');
+
+            } catch (e) {
+                console.error('Error in saveCurrentCard:', e);
+                alert('Error saving card: ' + e.message);
+            }
+        }
+
+        // 加载存档的名片
+        function loadCard(archive) {
+            console.log('Loading card:', archive.name);
+            try {
+                // 填充表单
+                if (inputs.name) inputs.name.value = archive.name || '';
+                if (inputs.title) inputs.title.value = archive.title || '';
+                if (inputs.phone) inputs.phone.value = archive.phone || '';
+                if (inputs.email) inputs.email.value = archive.email || '';
+                if (inputs.website) inputs.website.value = archive.website || '';
+                if (inputs.address) inputs.address.value = archive.address || '';
+
+                // 恢复头像调整参数
+                avatarAdjust = archive.avatarAdjust ? { scale: archive.avatarAdjust.scale, offsetX: archive.avatarAdjust.offsetX, offsetY: archive.avatarAdjust.offsetY } : { scale: 1, offsetX: 0, offsetY: 0 };
+
+                // 恢复头像（原始质量）
+                if (archive.avatarDataUrl) {
+                    const img = new Image();
+                    img.onload = function() {
+                        avatarImageObj = img;
+                        const statusEl = document.getElementById('avatar-status');
+                        if (statusEl) {
+                            statusEl.textContent = "✅ Headshot Loaded (from archive)";
+                            statusEl.style.color = "#00bc5d";
+                        }
+                        requestRender();
+                    };
+                    img.src = archive.avatarDataUrl;
+                } else {
+                    avatarImageObj = null;
+                    const statusEl = document.getElementById('avatar-status');
+                    if (statusEl) statusEl.textContent = "👤 Upload Avatar Photo";
+                }
+
+                console.log('Card loaded successfully');
+            } catch (e) {
+                console.error('Error loading card:', e);
+                alert('Error loading card: ' + e.message);
+            }
+        }
+
+        // 删除存档 - 使用 IndexedDB 异步操作
+        async function deleteCard(id, event) {
+            event.stopPropagation(); // 防止触发加载
+            console.log('Deleting card:', id);
+            if (!confirm('Are you sure you want to delete this archived card?')) return;
+
+            try {
+                await deleteArchive(id);
+                await renderArchiveListAsync();
+                console.log('Card deleted successfully');
+            } catch (e) {
+                console.error('Error deleting card:', e);
+                alert('Error deleting card: ' + e.message);
+            }
+        }
+
+        // 异步渲染存档列表
+        async function renderArchiveListAsync() {
+            console.log('Rendering archive list');
+            try {
+                const listEl = document.getElementById('archive-list');
+                const countEl = document.getElementById('archive-count');
+
+                if (!listEl || !countEl) {
+                    console.error('Archive list elements not found');
+                    return;
+                }
+
+                const archives = await getArchives();
+                console.log('Found archives:', archives.length);
+
+                countEl.textContent = archives.length > 0 ? `${archives.length} archived card(s)` : '';
+
+                if (archives.length === 0) {
+                    listEl.innerHTML = '<div class="archive-empty">No archived cards yet</div>';
+                    return;
+                }
+
+                listEl.innerHTML = archives.map(function(archive) {
+                    const date = new Date(archive.savedAt);
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    // 创建一个不包含大图片数据的轻量对象用于onclick
+                    const lightArchive = {
+                        id: archive.id,
+                        name: archive.name,
+                        title: archive.title,
+                        phone: archive.phone,
+                        email: archive.email,
+                        website: archive.website,
+                        address: archive.address,
+                        avatarAdjust: archive.avatarAdjust,
+                        avatarDataUrl: archive.avatarDataUrl,
+                        savedAt: archive.savedAt
+                    };
+                    const safeArchive = JSON.stringify(lightArchive).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    return `
+                        <div class="archive-item" onclick="loadCard(${safeArchive})">
+                            <div class="archive-item-info">
+                                <div class="archive-item-name">${escapeHtml(archive.name)}</div>
+                                <div class="archive-item-title">${escapeHtml(archive.title || 'No title')}</div>
+                                <div class="archive-item-date">${dateStr}</div>
+                            </div>
+                            <button class="btn-archive-delete" onclick="deleteCard(${archive.id}, event)">🗑️</button>
+                        </div>
+                    `;
+                }).join('');
+                console.log('Archive list rendered successfully');
+            } catch (e) {
+                console.error('Error rendering archive list:', e);
+            }
+        }
+
+        // 同步包装函数（用于初始化时调用）
+        function renderArchiveList() {
+            renderArchiveListAsync();
+        }
+
+        // HTML转义防止XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 页面加载时初始化数据库并渲染存档列表
+        initDB().then(function() {
+            console.log('Database initialized successfully');
+            renderArchiveList();
+        }).catch(function(err) {
+            console.error('Failed to initialize database:', err);
         });
     </script>
 </body>
